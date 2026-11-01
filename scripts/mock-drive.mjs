@@ -1,12 +1,13 @@
-// 개발용 모의 Google 서버: 앱이 쓰는 Drive API(v3) 일부와 OAuth 기기 코드 로그인을 흉내 낸다.
-// Google 계정 없이 여러 기기(브라우저 창) 사이의 동기화를 시험할 수 있다.
+// Mock Google server for development: emulates the parts of the Drive API (v3) the app uses,
+// plus the OAuth device-code sign-in. Lets you test sync between several "devices"
+// (browser windows) without a Google account.
 //
 //   npm run mock-drive          → http://127.0.0.1:8787
-//   GET  /device                → 기기 코드 승인 페이지
-//   GET  /debug/files           → 저장된 파일 목록
-//   POST /debug/expire-tokens   → 모든 액세스 토큰 만료 (토큰 갱신 시험)
+//   GET  /device                → device-code approval page
+//   GET  /debug/files           → list stored files
+//   POST /debug/expire-tokens   → expire all access tokens (to test token refresh)
 //
-// 데이터는 .mock-drive.json 에 저장되어 서버를 재시작해도 유지된다.
+// Data is kept in .mock-drive.json, so it survives server restarts.
 
 import { createServer } from "node:http";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
@@ -15,7 +16,7 @@ import { randomBytes } from "node:crypto";
 const PORT = Number(process.env.PORT ?? 8787);
 const BASE = `http://127.0.0.1:${PORT}`;
 const DATA_FILE = process.env.MOCK_DRIVE_FILE ?? ".mock-drive.json";
-const ACCOUNT = { email: "me@example.com", name: "테스트 사용자" };
+const ACCOUNT = { email: "me@example.com", name: "Test User" };
 
 const db = existsSync(DATA_FILE)
   ? JSON.parse(readFileSync(DATA_FILE, "utf8"))
@@ -27,11 +28,11 @@ const id = () => randomBytes(12).toString("hex");
 const meta = (f) => ({ id: f.id, name: f.name, version: String(f.version) });
 const logChange = (fileId, removed) => db.log.push({ fileId, removed });
 
-// 개발용 앱 주소에서 온 요청만 허용한다 (다른 웹사이트가 이 서버를 조작하지 못하게).
+// Only accept requests from the dev app's origins (so other websites can't drive this server).
 const ALLOWED_ORIGINS = new Set([
   "http://localhost:5173",
   "http://127.0.0.1:5173",
-  BASE, // /device 승인 페이지 자신
+  BASE, // the /device approval page itself
   "tauri://localhost",
   "http://tauri.localhost",
 ]);
@@ -68,7 +69,7 @@ function issueTokens(withRefresh) {
   return out;
 }
 
-/** multipart/related 본문에서 (메타데이터 JSON, 파일 내용)을 꺼낸다 */
+/** Extracts (metadata JSON, file content) from a multipart/related body */
 function parseMultipart(buf, contentType) {
   const boundary = Buffer.from(`--${/boundary=([^;]+)/.exec(contentType)[1]}`);
   const parts = [];
@@ -78,28 +79,28 @@ function parseMultipart(buf, contentType) {
     if (next < 0) break;
     const part = buf.subarray(start, next);
     const sep = part.indexOf("\r\n\r\n");
-    parts.push(part.subarray(sep + 4, part.length - 2)); // 끝의 \r\n 제외
+    parts.push(part.subarray(sep + 4, part.length - 2)); // drop the trailing \r\n
     start = next + boundary.length;
   }
   return { metadata: JSON.parse(parts[0].toString("utf8")), content: parts[1] };
 }
 
 const DEVICE_PAGE = (msg = "") => `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width">
-<title>모의 Google 로그인</title>
+<title>Mock Google sign-in</title>
 <body style="font-family:system-ui;max-width:420px;margin:60px auto;padding:0 16px">
-<h2>모의 Google 기기 로그인</h2><p>${msg || "앱에 표시된 코드를 입력하고 승인하세요."}</p>
+<h2>Mock Google device sign-in</h2><p>${msg || "Enter the code shown in the app and approve."}</p>
 <form method="post" action="/device"><input name="code" placeholder="ABCD-EFGH" style="font-size:20px;padding:8px;width:100%">
-<button style="margin-top:12px;font-size:16px;padding:8px 16px">${ACCOUNT.email} 로 승인</button></form></body>`;
+<button style="margin-top:12px;font-size:16px;padding:8px 16px">Approve as ${ACCOUNT.email}</button></form></body>`;
 
 createServer(async (req, res) => {
   const url = new URL(req.url, BASE);
   const path = url.pathname;
-  // 허용되지 않은 웹사이트에서 보낸 요청(CSRF)은 거부. curl 등 Origin 이 없는 로컬 도구는 허용.
+  // Reject requests from other websites (CSRF). Local tools without an Origin header (curl etc.) are allowed.
   if (req.headers.origin && !ALLOWED_ORIGINS.has(req.headers.origin)) return send(res, 403, { error: "origin not allowed" });
   if (req.method === "OPTIONS") return send(res, 204, "");
 
   try {
-    // ---- OAuth (기기 코드) ----
+    // ---- OAuth (device code) ----
     if (req.method === "POST" && path === "/device/code") {
       const deviceCode = id();
       const userCode = `${randomBytes(2).toString("hex")}-${randomBytes(2).toString("hex")}`.toUpperCase();
@@ -111,7 +112,7 @@ createServer(async (req, res) => {
       const code = new URLSearchParams((await readBody(req)).toString()).get("code")?.trim().toUpperCase();
       const entry = [...devices.values()].find((d) => d.userCode === code);
       if (entry) entry.approved = true;
-      return send(res, 200, DEVICE_PAGE(entry ? "승인했습니다. 앱으로 돌아가세요." : "코드를 찾을 수 없습니다."), "text/html; charset=utf-8");
+      return send(res, 200, DEVICE_PAGE(entry ? "Approved. You can go back to the app." : "Code not found."), "text/html; charset=utf-8");
     }
     if (req.method === "POST" && path === "/token") {
       const p = new URLSearchParams((await readBody(req)).toString());
@@ -127,7 +128,7 @@ createServer(async (req, res) => {
     }
     if (req.method === "POST" && path === "/revoke") return send(res, 200, {});
 
-    // ---- 디버그 ----
+    // ---- Debug ----
     if (path === "/debug/files") {
       return send(res, 200, Object.values(db.files).map((f) => ({ ...meta(f), bytes: Buffer.from(f.data, "base64").length })));
     }
@@ -137,7 +138,7 @@ createServer(async (req, res) => {
       return send(res, 200, { ok: true });
     }
 
-    // ---- 여기부터는 인증 필요 ----
+    // ---- Everything below requires authentication ----
     if (!authorized(req)) return send(res, 401, { error: { code: 401, message: "Invalid Credentials" } });
 
     if (path === "/oauth2/v3/userinfo") return send(res, 200, ACCOUNT);

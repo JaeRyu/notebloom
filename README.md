@@ -1,123 +1,149 @@
 # Notebloom
 
-Notion 스타일의 **개인 노트 앱**입니다. 하나의 코드베이스로 Windows, macOS, Linux, Android, iOS, 웹에서 실행되며,
-노트는 **내 Google Drive** 에 저장되어 같은 Google 계정으로 로그인한 모든 기기와 자동 동기화됩니다.
-별도 서버가 없고 Firebase 도 쓰지 않습니다.
+A Notion-style **personal note app**. One codebase runs on Windows, macOS, Linux, Android, iOS and the web.
+Notes are stored in **your own Google Drive** and sync automatically across every device signed in to the same Google account.
+There is no server and no Firebase.
 
-## 주요 기능
+> The app's UI is currently in Korean.
 
-- **블록 에디터**: `/` 슬래시 명령, 제목/목록/체크리스트/표/코드/인용 블록, 블록 드래그, 마크다운 단축키 (한국어 UI)
-- **노트 계층**: 무제한 하위 페이지, 사이드바에서 드래그 앤 드롭으로 이동, 브레드크럼
-- **로컬 우선**: 모든 노트는 먼저 기기(IndexedDB)에 저장 → 로그인 없이도, 오프라인에서도 동작
-- **Google Drive 동기화**: 편집 후 약 1.5초 뒤 업로드, 다른 기기는 5초 간격으로 변경을 감지해 반영
-- **충돌 없는 병합**: 두 기기에서 오프라인으로 같은 문단을 고쳐도 다시 연결되면 양쪽 편집이 모두 합쳐짐 (Yjs CRDT)
-- **휴지통**(복원 / 모든 기기에서 영구 삭제), **빠른 검색** `Ctrl/Cmd + K`, 다크 모드, 모바일 레이아웃
+## Features
 
-## 동작 방식
+- **Block editor**: `/` slash commands, headings, lists, checklists, tables, code and quote blocks, drag-to-reorder blocks, Markdown shortcuts
+- **Note hierarchy**: unlimited nested pages, drag and drop in the sidebar to re-parent, breadcrumbs
+- **Local-first**: every note is saved on the device first (IndexedDB), so the app works without signing in and while offline
+- **Google Drive sync**: edits upload about 1.5 s after you stop typing; other devices pick up changes every 5 s
+- **Conflict-free merging**: edit the same paragraph offline on two devices and both edits survive once they reconnect (Yjs CRDT)
+- **Trash** (restore / delete permanently on all devices), **quick search** `Ctrl/Cmd + K`, dark mode, mobile layout
+
+## How it works
 
 ```
- 기기 A (Windows 앱)          기기 B (Android 앱)          기기 C (웹)
- ┌──────────────────┐        ┌──────────────────┐
- │ 에디터 ↔ Yjs 문서 │        │ 에디터 ↔ Yjs 문서 │        ...
- │   ↕ IndexedDB    │        │   ↕ IndexedDB    │
- └────────┬─────────┘        └────────┬─────────┘
-          │  업로드/다운로드 (Drive REST API)  │
-          └───────────────┬───────────────────┘
-              내 Google Drive · 앱 전용 숨김 폴더 (appDataFolder)
-                index.yjs              페이지 목록·제목·계층
-                note-{id}.yjs          노트 본문 (노트마다 하나)
+ Device A (Windows app)        Device B (Android app)        Device C (web)
+ ┌──────────────────────┐      ┌──────────────────────┐
+ │ Editor ↔ Yjs document │      │ Editor ↔ Yjs document │      ...
+ │      ↕ IndexedDB      │      │      ↕ IndexedDB      │
+ └──────────┬───────────┘      └──────────┬───────────┘
+            │   upload / download (Drive REST API)   │
+            └───────────────────┬────────────────────┘
+          Your Google Drive · hidden app folder (appDataFolder)
+             index.yjs         page list, titles, hierarchy
+             note-{id}.yjs     note content (one file per note)
 ```
 
-- 앱은 `drive.appdata` 권한만 요청합니다. 이 앱이 만든 숨김 폴더에만 접근하며, Drive 의 다른 파일은 볼 수 없습니다.
-- 동기화 = 원격 파일 다운로드 → 로컬 문서에 병합 → 로컬에만 있는 내용이 있으면 업로드.
-  Yjs 는 병합 순서와 무관하게 같은 결과를 내고 중복 병합에도 안전해서, 두 기기가 동시에 업로드해 한쪽이 덮어써져도
-  다음 확인 때 차이를 발견하고 다시 올려 결국 모든 편집이 합쳐집니다.
-- 다른 기기의 변경은 Drive **changes API** 로 확인하므로, 바뀐 게 없으면 요청이 매우 가볍습니다.
+- The app only requests the `drive.appdata` scope. It can access the hidden folder it creates and nothing else in your Drive.
+- Sync = download the remote file → merge it into the local document → upload if the local copy has anything the remote one lacks.
+  Yjs merges are order-independent and safe to repeat, so even if two devices upload at the same moment and one overwrites the other,
+  the overwritten device notices the difference on its next check and uploads again. Every edit ends up merged.
+- Changes from other devices are detected with the Drive **changes API**, so polling is very cheap when nothing has changed.
 
-핵심 코드: [src/sync/engine.ts](src/sync/engine.ts) (동기화), [src/sync/drive.ts](src/sync/drive.ts) (Drive API),
-[src/sync/auth.ts](src/sync/auth.ts) (Google 로그인), [src/store/docs.ts](src/store/docs.ts) (로컬 저장)
+Key code: [src/sync/engine.ts](src/sync/engine.ts) (sync), [src/sync/drive.ts](src/sync/drive.ts) (Drive API),
+[src/sync/auth.ts](src/sync/auth.ts) (Google sign-in), [src/store/docs.ts](src/store/docs.ts) (local storage)
 
-## 빠르게 실행해 보기 (Google 계정 없이)
+## Try it without a Google account
 
-모의 Google 서버로 로그인·동기화를 시험할 수 있습니다. 필요: Node.js 20+
+A mock Google server lets you try sign-in and sync locally. Requires Node.js 20+.
 
 ```bash
 npm install
 ```
 
-터미널 1 (모의 Google Drive):
+Terminal 1 (mock Google Drive):
 
 ```bash
 npm run mock-drive
 ```
 
-터미널 2 (앱):
+Terminal 2 (the app):
 
 ```bash
 npm run dev:mock
 ```
 
-- <http://localhost:5173> 와 <http://127.0.0.1:5173> 은 저장소가 따로라서 **서로 다른 기기**처럼 동작합니다. 둘 다 열고 각각 연결해 보세요.
-- 연결하면 기기 코드가 표시됩니다. <http://127.0.0.1:8787/device> 에서 그 코드를 입력해 승인하세요.
-- 모의 서버를 껐다 켜면 오프라인 → 재연결 상황을 재현할 수 있습니다 (데이터는 `.mock-drive.json` 에 유지).
+- <http://localhost:5173> and <http://127.0.0.1:5173> have separate storage, so they behave like **two different devices**. Open both and connect each one.
+- Connecting shows a device code. Enter it at <http://127.0.0.1:8787/device> to approve.
+- Stop and restart the mock server to simulate going offline and reconnecting (its data persists in `.mock-drive.json`).
 
-## Google Drive 연결 설정 (실제 사용)
+## Connecting Google Drive
 
-모두 무료이며 결제 계정이 필요 없습니다. <https://console.cloud.google.com> 에서:
+### Official releases
 
-1. **프로젝트 만들기**
-2. **API 및 서비스 → 라이브러리** 에서 `Google Drive API` 사용 설정
-3. **API 및 서비스 → OAuth 동의 화면**
-   - 사용자 유형 `외부`, 앱 이름/이메일 입력
-   - 범위 추가: `.../auth/drive.appdata`, `openid`, `email`, `profile`
-   - 테스트 사용자에 본인 Gmail 추가
-   - 참고: 게시 상태가 `테스트`이면 Google 정책상 앱 로그인(갱신 토큰)이 7일마다 만료됩니다. 계속 쓰려면 `프로덕션으로 게시`하세요.
-     `drive.appdata` 는 Google 이 권장하는 좁은 범위라 심사 부담이 적은 편이며, 정확한 요구 사항은 콘솔에 표시됩니다.
-4. **API 및 서비스 → 사용자 인증 정보 → OAuth 클라이언트 ID 만들기** 를 두 번:
-   - `웹 애플리케이션` — 승인된 JavaScript 원본에 `http://localhost:5173` (와 웹 배포 주소) 추가 → 웹용
-   - `TV 및 입력 제한 기기` — 데스크톱/모바일 앱용 (클라이언트 ID + 보안 비밀)
-5. `.env.example` 을 `.env.local` 로 복사하고 위 값 입력
-6. 실행:
+If you install an official Notebloom release, there is nothing to set up. Just sign in with Google.
+
+### Building from source
+
+Google requires every app that accesses Drive to be registered, so if you build Notebloom yourself you register it once
+as **your own app** on Google Cloud. It's free (no billing account needed) and takes about 10 minutes. The setup helper walks you through it:
 
 ```bash
-npm run dev
+npm run setup:google
 ```
 
-로그인 방식:
-- **웹**: Google 로그인 팝업. 브라우저 정책상 갱신 토큰이 없어서 1시간 뒤 "다시 연결"을 눌러야 합니다.
-- **앱**(Windows·macOS·Android·iOS): 화면에 표시된 코드를 브라우저에서 한 번 입력하면 이후 자동으로 로그인이 유지됩니다.
-  네이티브 플러그인 없이 모든 플랫폼에서 같은 방식으로 동작합니다.
+It opens each Google Cloud console page in order, tells you what to fill in, checks the values you paste,
+**verifies your client with Google's servers**, and saves the result to `.env.local` (never committed).
+To re-check an existing setup:
 
-## 데스크톱 / 모바일 앱 빌드 (Tauri 2)
+```bash
+npm run setup:google -- --check
+```
 
-공통 준비: [Tauri 사전 요구 사항](https://v2.tauri.app/start/prerequisites/), Rust(`rustup`).
+<details>
+<summary>What the helper does, step by step (for reference)</summary>
+
+At <https://console.cloud.google.com>:
+
+1. **Create a project**
+2. **APIs & Services → Library**: enable the `Google Drive API`
+3. **OAuth consent screen** (Google Auth Platform)
+   - Audience `External`; app name and support email (the support email is shown on the sign-in screen)
+   - Data access (scopes): `.../auth/drive.appdata`, `openid`, `email`, `profile`
+   - **Publish to production.** While the app is in `Testing`, only listed test users can sign in and Google expires sign-ins (refresh tokens) every 7 days.
+     `drive.appdata` is a narrow scope recommended by Google; the console shows any verification requirements.
+4. **Credentials → Create OAuth client**, twice:
+   - `TVs and Limited Input devices`: for the desktop and mobile apps (client ID + client secret)
+   - `Web application`: for the web version; add `http://localhost:5173` (and your deployed URL) to the authorized JavaScript origins
+5. Copy `.env.example` to `.env.local` and fill in the values
+
+</details>
+
+How sign-in works:
+- **Web**: Google's sign-in popup. Browsers don't get a refresh token here, so you'll need to click "reconnect" after an hour.
+- **Apps** (Windows, macOS, Android, iOS): enter the code shown in the app once in your browser, and you stay signed in from then on.
+  It works the same way on every platform without native plugins.
+
+> **About the OAuth values:** client IDs are public identifiers (every site with Google sign-in exposes one), and Google does not treat
+> the client secret of installed apps as confidential. They can't be used to read anyone's notes (each user must sign in and consent),
+> and the Drive API is free, so there is no billing risk. They are kept out of this repository anyway; official builds include them at build time.
+
+## Building the desktop & mobile apps (Tauri 2)
+
+Common prerequisites: [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/), Rust (`rustup`).
 
 ### Windows
 
-- 준비: Visual Studio 2022 의 C++ 빌드 도구, WebView2 (Windows 11 기본 포함)
-- 개발 실행: `npm run desktop:dev`
-- 배포용 빌드: `npm run desktop:build` → `src-tauri/target/release/bundle/` 에 설치 파일 생성 (`.msi`, `-setup.exe`)
+- Requires: Visual Studio 2022 C++ build tools, WebView2 (preinstalled on Windows 11)
+- Run in development: `npm run desktop:dev`
+- Release build: `npm run desktop:build` → installers in `src-tauri/target/release/bundle/` (`.msi`, `-setup.exe`)
 
 ### Android
 
-- 준비: Android Studio (SDK + NDK), JDK 17 이상, Rust 의 Android 대상:
+- Requires: Android Studio (SDK + NDK), JDK 17+, and Rust's Android targets:
 
 ```bash
 rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
 ```
 
-- 환경 변수: `ANDROID_HOME=%LOCALAPPDATA%\Android\Sdk`, `NDK_HOME=%ANDROID_HOME%\ndk\<설치된 버전>`
-- Android 프로젝트는 [src-tauri/gen/android](src-tauri/gen/android) 에 이미 만들어져 있으므로 `android:init` 은 다시 할 필요가 없습니다.
-- 개발 실행 (연결된 폰/에뮬레이터): `npm run android:dev`
-- 테스트용 APK: `npx tauri android build --debug --apk` (디버그 키로 서명되어 바로 설치 가능)
-- 배포용: `npm run android:build` — Play 스토어 등에 올리려면 [서명 키 설정](https://v2.tauri.app/distribute/sign/android/)이 필요합니다.
-- Android 15+ 전체 화면(edge-to-edge) 대응: 상태 표시줄·키보드 영역 처리는
-  [MainActivity.kt](src-tauri/gen/android/app/src/main/java/io/github/jaeryu/notebloom/MainActivity.kt) 에 있습니다.
+- Environment variables: `ANDROID_HOME=%LOCALAPPDATA%\Android\Sdk`, `NDK_HOME=%ANDROID_HOME%\ndk\<installed version>`
+- The Android project already exists in [src-tauri/gen/android](src-tauri/gen/android), so you don't need `android:init`.
+- Run on a connected phone or emulator: `npm run android:dev`
+- Test APK: `npx tauri android build --debug --apk` (signed with a debug key, installable right away)
+- Release: `npm run android:build`. Publishing to the Play Store requires [signing setup](https://v2.tauri.app/distribute/sign/android/).
+- Android 15+ edge-to-edge handling (status bar, navigation bar and keyboard insets) lives in
+  [MainActivity.kt](src-tauri/gen/android/app/src/main/java/io/github/jaeryu/notebloom/MainActivity.kt).
 
-### macOS / iOS (Mac 필요)
+### macOS & iOS (a Mac is required)
 
-- iOS 앱은 Apple 정책상 **macOS + Xcode** 에서만 빌드할 수 있습니다 (Windows 에서는 불가).
-- Mac 에서:
+- Apple only allows iOS apps to be built on **macOS with Xcode** (not possible on Windows).
+- On a Mac:
 
 ```bash
 rustup target add aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios
@@ -131,56 +157,60 @@ npm run ios:init
 npm run ios:dev
 ```
 
-  `ios:init` 이 만드는 `src-tauri/gen/apple` 은 저장소에 커밋하세요.
-- 아이폰 설치·배포에는 Apple 개발자 계정이 필요합니다 (무료 계정은 본인 기기에 7일간 설치, App Store 배포는 유료 Apple Developer Program).
-- Mac 이 없으면 GitHub Actions 의 macOS 러너로 macOS/iOS 빌드를 할 수 있습니다 (서명 인증서를 저장소 Secrets 에 등록).
+  Commit the `src-tauri/gen/apple` folder that `ios:init` creates.
+- Installing on an iPhone requires an Apple account (a free account can install on your own device for 7 days; the App Store requires the paid Apple Developer Program).
+- Without a Mac, GitHub Actions macOS runners can build for macOS/iOS (store the signing certificates in the repository's Secrets).
 
-- 앱 식별자 [src-tauri/tauri.conf.json](src-tauri/tauri.conf.json) 의 `identifier`(`io.github.jaeryu.notebloom`)는 Android/iOS 패키지 이름이 되며, 스토어에 올린 뒤에는 바꿀 수 없습니다.
-- 앱의 네트워크 허용 목록은 [src-tauri/capabilities/default.json](src-tauri/capabilities/default.json) 에 있습니다 (Google 로그인/Drive API 주소만 허용).
-  앱(Tauri)에서 모의 서버로 시험하려면 개발 중에만 `{ "url": "http://127.0.0.1:8787/*" }` 를 임시로 추가하세요.
+Notes:
+- The app identifier `identifier` (`io.github.jaeryu.notebloom`) in [src-tauri/tauri.conf.json](src-tauri/tauri.conf.json) becomes the Android/iOS package name and can't be changed after publishing to a store.
+- The app's network allowlist is in [src-tauri/capabilities/default.json](src-tauri/capabilities/default.json) (only Google sign-in and the Drive API).
+  To test the desktop/mobile app against the mock server, temporarily add `{ "url": "http://127.0.0.1:8787/*" }` during development.
 
-## 프로젝트 구조
+## Security
+
+- **Least privilege**: the only Google scope is `drive.appdata` (the hidden app folder), and the app's network allowlist contains just the Google sign-in and Drive API hosts.
+- **CSP**: the desktop and mobile apps enforce a Content Security Policy that blocks external and inline scripts ([tauri.conf.json](src-tauri/tauri.conf.json)).
+  When hosting the web version, send a similar CSP header from your server (allowing Google's sign-in script and the Drive API):
+  `default-src 'self'; script-src 'self' https://accounts.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https://www.googleapis.com https://oauth2.googleapis.com; frame-src https://accounts.google.com; object-src 'none'; base-uri 'self'`
+- **Links in notes**: the editor (BlockNote) only accepts safe URL schemes such as http, https and mailto, so `javascript:` links are blocked; the apps open external links in the system browser.
+- **Android**: release builds don't allow unencrypted HTTP, and auto backup (`allowBackup`) is disabled so sign-in tokens never end up in device backups.
+- **Dependency audits**: run `npm audit` and `cargo audit` (RustSec).
+- **Known limitation**: sign-in tokens are stored in app storage (localStorage). Moving them to the OS keychain (Windows Credential Manager, macOS Keychain, Android Keystore) would be safer.
+
+## Project structure
 
 ```
 src/
-  store/docs.ts        Yjs 문서 + IndexedDB 저장 (문서 공유/해제)
-  store/notes.ts       페이지 목록(index 문서): 생성/수정/휴지통/영구 삭제
-  sync/auth.ts         Google 로그인 (웹 팝업 / 앱 기기 코드), 토큰 갱신
-  sync/drive.ts        Google Drive REST API (appDataFolder, changes, 업로드)
-  sync/engine.ts       동기화 엔진 (변경 감지, 병합, 업로드, 삭제 전파, 계정 전환)
-  components/          Sidebar, PageView, Editor, Home, Dialogs, ui
-  platform.ts          웹/앱(Tauri) 차이 처리 (HTTP, 외부 링크)
-scripts/mock-drive.mjs 개발용 모의 Google 서버
-src-tauri/             Tauri 2 네이티브 셸
+  store/docs.ts             Yjs documents + IndexedDB persistence (shared instances, release)
+  store/notes.ts            page list (index document): create, update, trash, delete permanently
+  sync/auth.ts              Google sign-in (web popup / device code in apps), token refresh
+  sync/drive.ts             Google Drive REST API (appDataFolder, changes, uploads)
+  sync/engine.ts            sync engine (change detection, merging, uploads, delete propagation, account switching)
+  components/               Sidebar, PageView, Editor, Home, Dialogs, ui
+  platform.ts               web vs. app (Tauri) differences (HTTP, external links)
+scripts/
+  setup-google.mjs          Google Drive setup helper (npm run setup:google)
+  mock-drive.mjs            mock Google server for development (npm run mock-drive)
+  third-party-notices.mjs   generates the open source license notices (runs on build)
+src-tauri/                  Tauri 2 native shell (Rust), Android project in gen/android
 ```
 
-## 보안
+## Known limitations / roadmap
 
-- **권한 최소화**: Google 권한은 `drive.appdata`(앱 전용 숨김 폴더)뿐이고, 앱의 네트워크 허용 목록도 Google 로그인/Drive API 주소 두 곳뿐입니다.
-- **CSP**: 데스크톱/모바일 앱에는 Content-Security-Policy 가 적용되어 외부·인라인 스크립트 실행이 차단됩니다 ([tauri.conf.json](src-tauri/tauri.conf.json)).
-  웹으로 배포할 때는 호스팅 서버에서 아래와 비슷한 CSP 헤더를 설정하세요 (Google 로그인 스크립트와 Drive API 허용):
-  `default-src 'self'; script-src 'self' https://accounts.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https://www.googleapis.com https://oauth2.googleapis.com; frame-src https://accounts.google.com; object-src 'none'; base-uri 'self'`
-- **노트 안 링크**: 에디터(BlockNote)가 http/https/mailto 등 안전한 주소만 허용해 `javascript:` 링크를 막고, 앱에서는 외부 링크를 시스템 브라우저로 엽니다.
-- **Android**: 릴리스 빌드는 암호화되지 않은 HTTP 를 허용하지 않고, 자동 백업(`allowBackup`)을 꺼서 로그인 토큰이 기기 백업에 포함되지 않습니다.
-- **의존성 점검**: `npm audit`, `cargo audit` (RustSec) 로 확인할 수 있습니다.
-- **알려진 한계**: 로그인 토큰은 앱 저장소(localStorage)에 보관합니다. OS 키체인(Windows 자격 증명 관리자, macOS 키체인, Android Keystore) 저장으로 바꾸면 더 안전합니다.
-  앱용 OAuth 클라이언트 보안 비밀은 앱에 포함되는데, 이는 Google 이 이 유형(TV 및 입력 제한 기기)에서 비밀로 취급하지 않는 값이라 정상입니다.
+- No image or file attachments yet (could be added as separate files in Drive)
+- Search only covers note titles
+- Store sign-in tokens in the OS keychain
+- One-click sign-in: return to the app automatically after signing in on desktop, native Google sign-in on Android
+- If the same note is open in several tabs of one browser, the tabs don't update each other in real time (changes arrive via Drive a few seconds later)
+- Note version history, export (Markdown/PDF), templates, English UI
 
-## 알려진 제약 / 다음 단계
-
-- 이미지·파일 첨부 없음 (Drive 에 별도 파일로 올리는 방식으로 추가 가능)
-- 검색은 노트 제목만 대상
-- 로그인 토큰을 OS 키체인에 저장하도록 강화
-- 같은 브라우저의 여러 탭에서 같은 노트를 동시에 열면 탭끼리는 실시간 반영되지 않음 (Drive 를 거쳐 몇 초 뒤 반영)
-- 노트 버전 기록, 내보내기(Markdown/PDF), 템플릿
-
-## 라이선스
+## License
 
 [MIT](LICENSE)
 
-에디터로 쓰는 [BlockNote](https://github.com/TypeCellOS/BlockNote) 의 핵심 패키지는 MPL-2.0 입니다. npm 패키지를 그대로 쓰는 것은 문제없지만,
-BlockNote 소스 파일 자체를 수정해 배포하면 그 파일은 MPL-2.0 으로 공개해야 합니다. (`@blocknote/xl-*` 패키지는 GPL/상용 라이선스이니 추가 시 주의)
+The core packages of [BlockNote](https://github.com/TypeCellOS/BlockNote), the editor, are MPL-2.0. Using the npm packages as-is is fine,
+but if you modify BlockNote's own source files and distribute them, those files must be published under MPL-2.0.
+(The `@blocknote/xl-*` packages are GPL/commercially licensed, so take care if you add them.)
 
-배포용 빌드(`npm run build`, `npm run desktop:build` 등)에는 사용한 오픈소스 패키지의 라이선스 원문이
-`THIRD_PARTY_NOTICES.txt` 로 자동 포함됩니다 ([scripts/third-party-notices.mjs](scripts/third-party-notices.mjs)).
-데스크톱/모바일 앱을 배포할 때는 Rust 크레이트(Tauri 등) 고지도 함께 넣어야 하므로 `cargo about` 같은 도구로 추가하세요.
+Release builds (`npm run build`, `npm run desktop:build`, …) automatically include `THIRD_PARTY_NOTICES.txt` with the license texts
+of every bundled npm package and Rust crate ([scripts/third-party-notices.mjs](scripts/third-party-notices.mjs)).

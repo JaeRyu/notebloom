@@ -1,7 +1,8 @@
-// 앱에 함께 배포되는 오픈소스 구성 요소(npm 패키지 + Rust 크레이트)의 라이선스 고지를
-// public/THIRD_PARTY_NOTICES.txt 로 모은다. `npm run build` 때 자동 실행되어 웹/데스크톱/모바일 빌드에 포함된다.
+// Collects the license notices of the open source components shipped with the app
+// (npm packages + Rust crates) into public/THIRD_PARTY_NOTICES.txt. Runs automatically on
+// `npm run build`, so the file is included in the web, desktop and mobile builds.
 //   npm run notices
-// 같은 라이선스 원문을 쓰는 구성 요소는 묶어서 원문을 한 번만 싣는다.
+// Components that share an identical license text are grouped so the text appears only once.
 
 import { execSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -21,8 +22,8 @@ function licenseTexts(dir) {
 }
 
 /**
- * 라이선스 파일을 패키지에 넣지 않은 구성 요소용: 선언된 SPDX 라이선스의 표준 원문을 붙인다.
- * "A OR B" 처럼 고를 수 있으면 MIT 를, 없으면 첫 번째를 적용하고, "A AND B" 는 모두 싣는다.
+ * For components that don't ship a license file: attach the standard SPDX text of the declared license.
+ * With a choice ("A OR B") MIT is used if offered, otherwise the first one; "A AND B" includes all.
  */
 function standardTexts(expr, holder) {
   const ids = expr.split(/\s+OR\s+|\s+AND\s+|\s*\/\s*|[()]/).map((s) => s.trim()).filter(Boolean);
@@ -30,7 +31,7 @@ function standardTexts(expr, holder) {
   return chosen.map((id) => {
     const text = spdx[id]?.licenseText;
     if (!text) return `(${id}: https://spdx.org/licenses/${id}.html)`;
-    return `[${id} — 패키지에 라이선스 파일이 없어 SPDX 표준 원문을 첨부 / standard SPDX text]\n\n${text
+    return `[${id} — standard SPDX text (the package ships no license file)]\n\n${text
       .replace(/<year>\s*<(copyright holders|owner)>/g, holder)
       .trim()}`;
   });
@@ -38,14 +39,14 @@ function standardTexts(expr, holder) {
 
 const cleanRepo = (url) => url?.replace(/^git\+/, "").replace(/\.git$/, "");
 
-// ---- npm 패키지 (프로덕션 의존성) ----
+// ---- npm packages (production dependencies) ----
 
 function npmComponents() {
   let out;
   try {
     out = execSync("npm ls --omit=dev --all --parseable", { cwd: root, maxBuffer: 1 << 26 }).toString();
   } catch (e) {
-    out = e.stdout?.toString() ?? ""; // 피어 의존성 경고가 있어도 목록은 나온다
+    out = e.stdout?.toString() ?? ""; // the list is still printed even with peer-dependency warnings
   }
   const list = new Map();
   for (const dir of new Set(out.split(/\r?\n/).filter(Boolean).slice(1))) {
@@ -61,13 +62,13 @@ function npmComponents() {
         holder: typeof pkg.author === "string" ? pkg.author : (pkg.author?.name ?? `${pkg.name} contributors`),
       });
     } catch {
-      /* package.json 이 없는 경로는 건너뛴다 */
+      /* skip paths without a package.json */
     }
   }
   return [...list.values()];
 }
 
-// ---- Rust 크레이트 (Tauri 앱에 링크되는 일반 의존성, 빌드 전용 의존성 제외) ----
+// ---- Rust crates (normal dependencies linked into the Tauri app; build-only dependencies excluded) ----
 
 function rustComponents() {
   const manifest = path.join(root, "src-tauri", "Cargo.toml");
@@ -82,12 +83,12 @@ function rustComponents() {
       }).toString(),
     );
   } catch {
-    console.warn("cargo metadata 를 실행할 수 없어 Rust 크레이트 고지를 건너뜁니다 (Rust 설치 / Cargo.lock 확인).");
+    console.warn("Can't run `cargo metadata`; skipping Rust crate notices (is Rust installed / Cargo.lock present?).");
     return [];
   }
   const nodes = new Map(meta.resolve.nodes.map((n) => [n.id, n]));
   const pkgs = new Map(meta.packages.map((p) => [p.id, p]));
-  // 모든 대상 플랫폼(Windows/macOS/Linux/Android/iOS)의 의존성을 포함하므로 실제보다 조금 넓다.
+  // Includes dependencies for every target platform (Windows/macOS/Linux/Android/iOS), so slightly broader than any single build.
   const seen = new Set();
   const stack = [meta.resolve.root];
   while (stack.length) {
@@ -104,16 +105,16 @@ function rustComponents() {
     const dir = path.dirname(p.manifest_path);
     const texts = licenseTexts(dir);
     if (!texts.length && p.license_file) texts.push(readFileSync(path.join(dir, p.license_file), "utf8").trim());
-    const holder = p.authors?.length ? p.authors.map((a) => a.replace(/s*<[^>]*>/, "")).join(", ") : `${p.name} contributors`;
+    const holder = p.authors?.length ? p.authors.map((a) => a.replace(/\s*<[^>]*>/, "")).join(", ") : `${p.name} contributors`;
     return { id: `crate: ${p.name}@${p.version}`, license: p.license ?? "UNKNOWN", repo: p.repository, texts, holder };
   });
 }
 
-// ---- npm/crates 에 없는 출처 ----
+// ---- Sources that aren't npm packages or crates ----
 
 const extras = [
   {
-    id: "Lucide icons (일부 UI 아이콘의 SVG 경로, src/components/ui.tsx)",
+    id: "Lucide icons (SVG paths of some UI icons, src/components/ui.tsx)",
     license: "ISC",
     repo: "https://github.com/lucide-icons/lucide",
     texts: [
@@ -128,7 +129,7 @@ THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH RE
   },
 ];
 
-// ---- 출력: 같은 원문끼리 묶기 ----
+// ---- Output: group components with identical license texts ----
 
 const npm = npmComponents();
 const crates = rustComponents();
@@ -144,12 +145,10 @@ for (const c of all) {
 }
 
 const sep = "\n" + "=".repeat(78) + "\n";
-const header = `Notebloom 은 아래의 오픈소스 소프트웨어를 포함하고 있습니다.
-This application includes the following third-party open source software.
+const header = `Notebloom includes the following third-party open source software.
 
-MPL-2.0 로 배포되는 구성 요소(BlockNote 등)는 수정하지 않고 사용했으며,
-해당 소스 코드는 각 항목의 Source 주소에서 받을 수 있습니다.
-Source code for MPL-2.0 components is available at the Source URLs below.
+Components distributed under MPL-2.0 (such as BlockNote) are used unmodified;
+their source code is available at the Source URLs listed below.
 
 npm packages: ${npm.length}, Rust crates: ${crates.length}, other: ${extras.length}
 `;
