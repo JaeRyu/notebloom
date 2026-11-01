@@ -145,9 +145,17 @@ let cancelDevice: (() => void) | null = null;
 /** 대화형 로그인. 성공하면 계정 정보를 반환한다. */
 export async function signIn(): Promise<Account> {
   const result = authFlow === "web" ? await signInWeb() : await signInDevice();
-  const account = await fetchAccount(result.accessToken);
-  save({ account, ...result });
-  return account;
+  // 앱이 백그라운드에서 멈춰 있다 돌아온 직후면 첫 요청이 끊길 수 있어 몇 번 다시 시도한다.
+  for (let attempt = 1; ; attempt++) {
+    try {
+      const account = await fetchAccount(result.accessToken);
+      save({ account, ...result });
+      return account;
+    } catch (e) {
+      if (attempt >= 5) throw e;
+      await waitOrVisible(2000);
+    }
+  }
 }
 
 export function cancelSignIn() {
@@ -174,6 +182,20 @@ interface DeviceCodeResponse {
   error?: string;
 }
 
+/** ms 만큼 기다리되, 앱이 다시 화면에 보이면 바로 끝낸다 (브라우저에서 승인하고 돌아오면 즉시 확인). */
+function waitOrVisible(ms: number) {
+  return new Promise<void>((resolve) => {
+    const done = () => {
+      clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+      resolve();
+    };
+    const onVisible = () => document.visibilityState === "visible" && done();
+    const timer = setTimeout(done, ms);
+    document.addEventListener("visibilitychange", onVisible);
+  });
+}
+
 async function signInDevice() {
   const clientId = env.VITE_GOOGLE_DEVICE_CLIENT_ID ?? (MOCK ? "mock" : "");
   const clientSecret = env.VITE_GOOGLE_DEVICE_CLIENT_SECRET ?? (MOCK ? "mock" : "");
@@ -193,14 +215,21 @@ async function signInDevice() {
   let interval = code.interval * 1000;
   try {
     while (Date.now() < expiresAt) {
-      await new Promise((r) => setTimeout(r, interval));
+      await waitOrVisible(interval);
       if (cancelled) throw new Error("로그인을 취소했습니다.");
-      const { data } = await postForm<TokenResponse>(`${OAUTH}/token`, {
-        client_id: clientId,
-        client_secret: clientSecret,
-        device_code: code.device_code,
-        grant_type: "urn:ietf:params:oauth:grant-type:device_code",
-      });
+      let data: TokenResponse;
+      try {
+        ({ data } = await postForm<TokenResponse>(`${OAUTH}/token`, {
+          client_id: clientId,
+          client_secret: clientSecret,
+          device_code: code.device_code,
+          grant_type: "urn:ietf:params:oauth:grant-type:device_code",
+        }));
+      } catch {
+        // 브라우저로 코드를 입력하러 간 사이 모바일 OS 가 앱을 멈추면 요청이 끊긴다.
+        // 로그인 자체는 Google 쪽에서 계속 기다리고 있으므로 다음 차례에 다시 확인한다.
+        continue;
+      }
       if (data.access_token) {
         return {
           accessToken: data.access_token,
