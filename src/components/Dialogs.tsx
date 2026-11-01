@@ -52,7 +52,8 @@ export function AccountDialog({ onClose }: { onClose: () => void }) {
 
   if (device) {
     return (
-      <Modal title="Google 계정 연결" onClose={cancelSignIn} width={440}>
+      // 브라우저에서 코드를 입력하고 돌아와 창을 클릭할 때 로그인이 취소되지 않도록 바깥 클릭으로는 닫지 않는다.
+      <Modal title="Google 계정 연결" onClose={cancelSignIn} width={440} dismissible={false}>
         <div className="dialog-body device-login">
           <p>
             브라우저에서 <b>{device.verificationUrl.replace(/^https?:\/\//, "")}</b> 에 접속해 아래 코드를 입력하세요.

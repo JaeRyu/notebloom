@@ -46,21 +46,25 @@ export function Modal({
   children,
   width = 480,
   className = "",
+  dismissible = true,
 }: {
   title?: string;
   onClose: () => void;
   children: ReactNode;
   width?: number;
   className?: string;
+  /** false 면 바깥 클릭·Esc 로 닫히지 않는다 (진행 중인 작업을 실수로 취소하지 않게) */
+  dismissible?: boolean;
 }) {
   useEffect(() => {
+    if (!dismissible) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [onClose, dismissible]);
 
   return (
-    <div className="modal-backdrop" onMouseDown={onClose}>
+    <div className="modal-backdrop" onMouseDown={dismissible ? onClose : undefined}>
       <div
         className={`modal ${className}`}
         style={{ maxWidth: width }}
