@@ -27,10 +27,20 @@ const id = () => randomBytes(12).toString("hex");
 const meta = (f) => ({ id: f.id, name: f.name, version: String(f.version) });
 const logChange = (fileId, removed) => db.log.push({ fileId, removed });
 
+// 개발용 앱 주소에서 온 요청만 허용한다 (다른 웹사이트가 이 서버를 조작하지 못하게).
+const ALLOWED_ORIGINS = new Set([
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+  BASE, // /device 승인 페이지 자신
+  "tauri://localhost",
+  "http://tauri.localhost",
+]);
+
 function send(res, status, body, type = "application/json") {
+  const origin = res.req.headers.origin;
   res.writeHead(status, {
     "Content-Type": type,
-    "Access-Control-Allow-Origin": "*",
+    ...(origin && ALLOWED_ORIGINS.has(origin) ? { "Access-Control-Allow-Origin": origin, Vary: "Origin" } : {}),
     "Access-Control-Allow-Headers": "Authorization, Content-Type",
     "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
   });
@@ -84,6 +94,8 @@ const DEVICE_PAGE = (msg = "") => `<!doctype html><meta charset="utf-8"><meta na
 createServer(async (req, res) => {
   const url = new URL(req.url, BASE);
   const path = url.pathname;
+  // 허용되지 않은 웹사이트에서 보낸 요청(CSRF)은 거부. curl 등 Origin 이 없는 로컬 도구는 허용.
+  if (req.headers.origin && !ALLOWED_ORIGINS.has(req.headers.origin)) return send(res, 403, { error: "origin not allowed" });
   if (req.method === "OPTIONS") return send(res, 204, "");
 
   try {
