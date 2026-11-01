@@ -889,9 +889,9 @@ a.crumb:hover {
   color: var(--warn);
 }
 
-/* ---------- 모바일 ---------- */
+/* ---------- 모바일 (hooks.ts 의 WIDE_LAYOUT_MIN_WIDTH 와 맞출 것) ---------- */
 
-@media (max-width: 767px) {
+@media (max-width: 599px) {
   .page-header,
   .child-pages {
     padding: 0 20px;
@@ -917,6 +917,63 @@ a.crumb:hover {
   }
   .card-grid {
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  }
+}
+
+/* ---------- 중간 폭: 펼친 폴더블 세로 화면, 작은 태블릿, 좁은 분할 화면 ---------- */
+
+@media (min-width: 600px) and (max-width: 899px) {
+  .sidebar {
+    width: 224px;
+  }
+  .page-header,
+  .child-pages {
+    padding: 0 28px;
+  }
+  .page-header {
+    padding-top: 32px;
+  }
+  .editor-wrap .bn-editor,
+  .editor-loading {
+    padding-inline: 28px;
+  }
+  .page-title {
+    font-size: 32px;
+  }
+  .home {
+    padding: 32px 28px;
+  }
+  .card-grid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  }
+}
+
+/* ---------- 터치 화면: 손가락으로 누르기 쉬운 크기, 키보드 단축키 안내 숨김 ----------
+   일부 Android WebView(에뮬레이터 등)는 터치 화면인데도 pointer: fine 으로 알리므로 hover: none 도 함께 본다. */
+
+@media (pointer: coarse), (hover: none) {
+  kbd {
+    display: none;
+  }
+  .tree-row {
+    height: 40px;
+  }
+  .twisty {
+    width: 28px;
+    height: 28px;
+  }
+  .row-actions button {
+    width: 32px;
+    height: 32px;
+  }
+  .icon-btn {
+    width: 36px;
+    height: 36px;
+  }
+  .side-nav button,
+  .side-footer > button,
+  .tree-add {
+    padding-block: 10px;
   }
 }
 

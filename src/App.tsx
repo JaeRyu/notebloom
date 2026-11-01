@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useIsMobile, usePages, usePageTree, useRoute } from "./hooks";
+import { useIsMobile, usePages, usePageTree, useRoute, WIDE_LAYOUT_MIN_WIDTH } from "./hooks";
 import { resumeSync } from "./sync/engine";
 import { AccountDialog, QuickSearch, TrashDialog } from "./components/Dialogs";
 import { Home } from "./components/Home";
@@ -14,7 +14,7 @@ export default function App() {
   const tree = usePageTree(pages);
   const route = useRoute();
   const isMobile = useIsMobile();
-  const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 768);
+  const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= WIDE_LAYOUT_MIN_WIDTH);
   const [dialog, setDialog] = useState<DialogKind>(null);
 
   // 이전에 Google 계정을 연결했다면 동기화를 이어간다.

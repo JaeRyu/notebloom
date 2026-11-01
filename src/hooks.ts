@@ -118,8 +118,15 @@ function subscribeResize(cb: () => void) {
   return () => window.removeEventListener("resize", cb);
 }
 
+/**
+ * 이 폭(dp/CSS px)부터 사이드바를 옆에 고정한다. Android 의 '중간 창 크기' 기준(600dp)과 같아서
+ * 펼친 폴더블(갤럭시 폴드 세로 약 670~750dp)·태블릿은 사이드바가, 휴대폰·폴드 커버 화면은 드로어가 된다.
+ * styles.css 의 미디어 쿼리(599px)와 맞춰야 한다.
+ */
+export const WIDE_LAYOUT_MIN_WIDTH = 600;
+
 export function useIsMobile() {
-  return useSyncExternalStore(subscribeResize, () => window.innerWidth < 768);
+  return useSyncExternalStore(subscribeResize, () => window.innerWidth < WIDE_LAYOUT_MIN_WIDTH);
 }
 
 export function pageTitle(p: Page | undefined) {
