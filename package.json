@@ -7,7 +7,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:mock": "vite --mode mock --host 127.0.0.1",
+    "dev:mock": "vite --mode mock --host 127.0.0.1 --port 5174 --strictPort",
     "mock-drive": "node scripts/mock-drive.mjs",
     "setup:google": "node scripts/setup-google.mjs",
     "build": "npm run notices && tsc --noEmit && vite build",

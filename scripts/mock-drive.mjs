@@ -49,8 +49,8 @@ const logChange = (fileId, removed) => db.log.push({ fileId, removed });
 
 // Only accept requests from the dev app's origins (so other websites can't drive this server).
 const ALLOWED_ORIGINS = new Set([
-  "http://localhost:5173",
-  "http://127.0.0.1:5173",
+  "http://localhost:5174", // npm run dev:mock (kept off 5173 so it never shadows the app's dev server)
+  "http://127.0.0.1:5174",
   BASE, // the /device approval page itself
   "tauri://localhost",
   "http://tauri.localhost",

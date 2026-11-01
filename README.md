@@ -62,7 +62,7 @@ Terminal 2 (the app):
 npm run dev:mock
 ```
 
-- <http://localhost:5173> and <http://127.0.0.1:5173> have separate storage, so they behave like **two different devices**. Open both and connect each one.
+- <http://localhost:5174> and <http://127.0.0.1:5174> have separate storage, so they behave like **two different devices**. Open both and connect each one.
 - Connecting shows a device code. Enter it at <http://127.0.0.1:8787/device> to approve.
 - Stop and restart the mock server to simulate going offline and reconnecting (its data persists in `.mock-drive.json`).
 
