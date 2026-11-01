@@ -77,6 +77,7 @@ function TitleInput({
       value={local}
       readOnly={readOnly}
       autoFocus={autoFocus}
+      enterKeyHint="next"
       onFocus={() => (focused.current = true)}
       onBlur={() => {
         focused.current = false;
@@ -86,6 +87,12 @@ function TitleInput({
         const v = e.target.value.replace(/\n/g, "");
         setLocal(v);
         clearTimeout(timer.current);
+        // 모바일 키보드는 Enter 를 keydown 대신 줄바꿈 입력으로 보내는 경우가 있어 여기서도 본문으로 넘긴다.
+        if (e.target.value.includes("\n")) {
+          commit(v);
+          onEnter();
+          return;
+        }
         timer.current = setTimeout(() => onChange(v), 400);
       }}
       onKeyDown={(e) => {

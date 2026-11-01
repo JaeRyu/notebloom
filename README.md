@@ -90,16 +90,52 @@ npm run dev
 
 ## 데스크톱 / 모바일 앱 빌드 (Tauri 2)
 
-사전 준비: [Tauri 사전 요구 사항](https://v2.tauri.app/start/prerequisites/) — Rust(`rustup`), Windows는 WebView2(기본 설치)와 MSVC 빌드 도구,
-macOS는 Xcode, Android는 Android Studio + SDK/NDK (`ANDROID_HOME`, `NDK_HOME` 환경 변수).
+공통 준비: [Tauri 사전 요구 사항](https://v2.tauri.app/start/prerequisites/), Rust(`rustup`).
 
-| 플랫폼 | 개발 실행 | 배포용 빌드 |
-| --- | --- | --- |
-| Windows / macOS / Linux | `npm run desktop:dev` | `npm run desktop:build` (각 OS에서 빌드) |
-| Android | `npm run android:init` 후 `npm run android:dev` | `npm run android:build` |
-| iOS (macOS 필요) | `npm run ios:init` 후 `npm run ios:dev` | `npx tauri ios build` |
+### Windows
 
-- 앱 식별자 [src-tauri/tauri.conf.json](src-tauri/tauri.conf.json) 의 `identifier`(`io.github.jaeryu.notebloom`)는 Android 패키지 이름이 되며 나중에 바꾸기 어렵습니다. GitHub 아이디가 다르면 `npm run android:init` 전에 고치세요.
+- 준비: Visual Studio 2022 의 C++ 빌드 도구, WebView2 (Windows 11 기본 포함)
+- 개발 실행: `npm run desktop:dev`
+- 배포용 빌드: `npm run desktop:build` → `src-tauri/target/release/bundle/` 에 설치 파일 생성 (`.msi`, `-setup.exe`)
+
+### Android
+
+- 준비: Android Studio (SDK + NDK), JDK 17 이상, Rust 의 Android 대상:
+
+```bash
+rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
+```
+
+- 환경 변수: `ANDROID_HOME=%LOCALAPPDATA%\Android\Sdk`, `NDK_HOME=%ANDROID_HOME%\ndk\<설치된 버전>`
+- Android 프로젝트는 [src-tauri/gen/android](src-tauri/gen/android) 에 이미 만들어져 있으므로 `android:init` 은 다시 할 필요가 없습니다.
+- 개발 실행 (연결된 폰/에뮬레이터): `npm run android:dev`
+- 테스트용 APK: `npx tauri android build --debug --apk` (디버그 키로 서명되어 바로 설치 가능)
+- 배포용: `npm run android:build` — Play 스토어 등에 올리려면 [서명 키 설정](https://v2.tauri.app/distribute/sign/android/)이 필요합니다.
+- Android 15+ 전체 화면(edge-to-edge) 대응: 상태 표시줄·키보드 영역 처리는
+  [MainActivity.kt](src-tauri/gen/android/app/src/main/java/io/github/jaeryu/notebloom/MainActivity.kt) 에 있습니다.
+
+### macOS / iOS (Mac 필요)
+
+- iOS 앱은 Apple 정책상 **macOS + Xcode** 에서만 빌드할 수 있습니다 (Windows 에서는 불가).
+- Mac 에서:
+
+```bash
+rustup target add aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios
+```
+
+```bash
+npm run ios:init
+```
+
+```bash
+npm run ios:dev
+```
+
+  `ios:init` 이 만드는 `src-tauri/gen/apple` 은 저장소에 커밋하세요.
+- 아이폰 설치·배포에는 Apple 개발자 계정이 필요합니다 (무료 계정은 본인 기기에 7일간 설치, App Store 배포는 유료 Apple Developer Program).
+- Mac 이 없으면 GitHub Actions 의 macOS 러너로 macOS/iOS 빌드를 할 수 있습니다 (서명 인증서를 저장소 Secrets 에 등록).
+
+- 앱 식별자 [src-tauri/tauri.conf.json](src-tauri/tauri.conf.json) 의 `identifier`(`io.github.jaeryu.notebloom`)는 Android/iOS 패키지 이름이 되며, 스토어에 올린 뒤에는 바꿀 수 없습니다.
 - 앱의 네트워크 허용 목록은 [src-tauri/capabilities/default.json](src-tauri/capabilities/default.json) 에 있습니다 (Google 로그인/Drive API 주소만 허용).
   앱(Tauri)에서 모의 서버로 시험하려면 개발 중에만 `{ "url": "http://127.0.0.1:8787/*" }` 를 임시로 추가하세요.
 
@@ -118,11 +154,23 @@ scripts/mock-drive.mjs 개발용 모의 Google 서버
 src-tauri/             Tauri 2 네이티브 셸
 ```
 
+## 보안
+
+- **권한 최소화**: Google 권한은 `drive.appdata`(앱 전용 숨김 폴더)뿐이고, 앱의 네트워크 허용 목록도 Google 로그인/Drive API 주소 두 곳뿐입니다.
+- **CSP**: 데스크톱/모바일 앱에는 Content-Security-Policy 가 적용되어 외부·인라인 스크립트 실행이 차단됩니다 ([tauri.conf.json](src-tauri/tauri.conf.json)).
+  웹으로 배포할 때는 호스팅 서버에서 아래와 비슷한 CSP 헤더를 설정하세요 (Google 로그인 스크립트와 Drive API 허용):
+  `default-src 'self'; script-src 'self' https://accounts.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https://www.googleapis.com https://oauth2.googleapis.com; frame-src https://accounts.google.com; object-src 'none'; base-uri 'self'`
+- **노트 안 링크**: 에디터(BlockNote)가 http/https/mailto 등 안전한 주소만 허용해 `javascript:` 링크를 막고, 앱에서는 외부 링크를 시스템 브라우저로 엽니다.
+- **Android**: 릴리스 빌드는 암호화되지 않은 HTTP 를 허용하지 않고, 자동 백업(`allowBackup`)을 꺼서 로그인 토큰이 기기 백업에 포함되지 않습니다.
+- **의존성 점검**: `npm audit`, `cargo audit` (RustSec) 로 확인할 수 있습니다.
+- **알려진 한계**: 로그인 토큰은 앱 저장소(localStorage)에 보관합니다. OS 키체인(Windows 자격 증명 관리자, macOS 키체인, Android Keystore) 저장으로 바꾸면 더 안전합니다.
+  앱용 OAuth 클라이언트 보안 비밀은 앱에 포함되는데, 이는 Google 이 이 유형(TV 및 입력 제한 기기)에서 비밀로 취급하지 않는 값이라 정상입니다.
+
 ## 알려진 제약 / 다음 단계
 
 - 이미지·파일 첨부 없음 (Drive 에 별도 파일로 올리는 방식으로 추가 가능)
 - 검색은 노트 제목만 대상
-- 앱의 로그인 토큰은 앱 저장소(localStorage)에 보관 → OS 키체인 저장으로 강화 가능
+- 로그인 토큰을 OS 키체인에 저장하도록 강화
 - 같은 브라우저의 여러 탭에서 같은 노트를 동시에 열면 탭끼리는 실시간 반영되지 않음 (Drive 를 거쳐 몇 초 뒤 반영)
 - 노트 버전 기록, 내보내기(Markdown/PDF), 템플릿
 
