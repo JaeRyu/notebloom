@@ -1,24 +1,46 @@
+# 의존성 / 빌드 결과
 node_modules
 dist
 *.log
+*.tsbuildinfo
+coverage
 
-# 개인 설정 (Google OAuth 클라이언트 값 등) — 절대 커밋하지 않는다
-.env.local
-.env.*.local
+# 환경 변수 — 개인 설정(Google OAuth 클라이언트 값 등)은 절대 커밋하지 않는다.
+# 예시 파일(.env.example)과 비밀이 없는 모의 서버 설정(.env.mock)만 저장소에 둔다.
+.env
+.env.*
+!.env.example
+!.env.mock
 
 # 모의 Drive 서버 데이터 (테스트 토큰 포함)
 .mock-drive.json
 
-# Tauri 빌드 산출물
+# 빌드 때 생성되는 오픈소스 라이선스 고지
+public/THIRD_PARTY_NOTICES.txt
+
+# Tauri / Rust
 src-tauri/target
 src-tauri/gen/schemas
 
-# OS / 에디터
-.DS_Store
-Thumbs.db
+# 모바일 빌드 산출물과 서명 키 (키는 유출되면 앱을 위조할 수 있다)
+*.apk
+*.aab
+*.ipa
+*.jks
+*.keystore
+*.p12
+*.mobileprovision
+key.properties
+keystore.properties
+local.properties
+xcuserdata/
+
+# 개인 개발 도구 설정
+.claude/
+.idea
 .vscode/*
 !.vscode/extensions.json
-.idea
 
-# 빌드 때 생성되는 오픈소스 라이선스 고지
-public/THIRD_PARTY_NOTICES.txt
+# OS
+.DS_Store
+Thumbs.db
