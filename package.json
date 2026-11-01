@@ -9,7 +9,7 @@
     "dev": "vite",
     "dev:mock": "vite --mode mock --host 127.0.0.1",
     "mock-drive": "node scripts/mock-drive.mjs",
-    "build": "tsc --noEmit && vite build",
+    "build": "npm run notices && tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "tauri": "tauri",
@@ -19,7 +19,8 @@
     "android:dev": "tauri android dev",
     "android:build": "tauri android build",
     "ios:init": "tauri ios init",
-    "ios:dev": "tauri ios dev"
+    "ios:dev": "tauri ios dev",
+    "notices": "node scripts/third-party-notices.mjs"
   },
   "dependencies": {
     "@blocknote/core": "^0.57.0",

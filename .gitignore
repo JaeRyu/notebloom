@@ -19,3 +19,6 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 .idea
+
+# 빌드 때 생성되는 오픈소스 라이선스 고지
+public/THIRD_PARTY_NOTICES.txt

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useSyncStatus } from "../sync/engine";
 
+// 일부 아이콘 경로는 Lucide(ISC) / Feather(MIT) 아이콘을 바탕으로 했다. 고지는 THIRD_PARTY_NOTICES 에 포함된다.
 const ICONS = {
   search: "M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm10 2-4.35-4.35",
   home: "M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-9.5Z",

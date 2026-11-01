@@ -1,4 +1,3 @@
-import "@blocknote/core/fonts/inter.css";
 import "@blocknote/mantine/style.css";
 import { useEffect, useMemo } from "react";
 import type * as Y from "yjs";

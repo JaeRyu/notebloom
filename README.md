@@ -132,3 +132,7 @@ src-tauri/             Tauri 2 네이티브 셸
 
 에디터로 쓰는 [BlockNote](https://github.com/TypeCellOS/BlockNote) 의 핵심 패키지는 MPL-2.0 입니다. npm 패키지를 그대로 쓰는 것은 문제없지만,
 BlockNote 소스 파일 자체를 수정해 배포하면 그 파일은 MPL-2.0 으로 공개해야 합니다. (`@blocknote/xl-*` 패키지는 GPL/상용 라이선스이니 추가 시 주의)
+
+배포용 빌드(`npm run build`, `npm run desktop:build` 등)에는 사용한 오픈소스 패키지의 라이선스 원문이
+`THIRD_PARTY_NOTICES.txt` 로 자동 포함됩니다 ([scripts/third-party-notices.mjs](scripts/third-party-notices.mjs)).
+데스크톱/모바일 앱을 배포할 때는 Rust 크레이트(Tauri 등) 고지도 함께 넣어야 하므로 `cargo about` 같은 도구로 추가하세요.
