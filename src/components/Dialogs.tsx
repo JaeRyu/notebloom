@@ -96,11 +96,12 @@ export function AccountDialog({ onClose }: { onClose: () => void }) {
         {!account ? (
           <>
             <p>
-              Google 계정을 연결하면 노트가 내 <b>Google Drive 의 앱 전용 숨김 폴더</b>에 저장되고, 같은 계정으로 로그인한 다른
+              Google 계정을 연결하면 노트가 내 <b>Google Drive 의 'Notebloom' 폴더</b>에 저장되고, 같은 계정으로 로그인한 다른
               기기(Windows · Mac · Android 등)와 자동으로 동기화됩니다.
             </p>
             <ul className="bullets muted small">
               <li>이 앱이 만든 파일에만 접근하며, Drive 의 다른 파일은 볼 수 없습니다.</li>
+              <li>'Notebloom' 폴더 안의 파일은 앱이 관리하니 직접 수정하거나 지우지 마세요.</li>
               <li>연결 전에 쓴 노트도 그대로 올라갑니다.</li>
               <li>오프라인에서도 계속 쓸 수 있고, 연결되면 자동으로 합쳐집니다.</li>
             </ul>

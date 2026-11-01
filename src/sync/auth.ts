@@ -4,8 +4,9 @@ import type { Account } from "../types";
 import { AuthError, GOOGLE_API, usingMockGoogle } from "./drive";
 
 /**
- * Google 로그인 (OAuth 2.0). 요청 권한은 Drive 의 '앱 전용 숨김 폴더'(drive.appdata) 뿐이라
+ * Google 로그인 (OAuth 2.0). 요청 권한은 drive.file(이 앱이 만든 파일만) 뿐이라
  * 사용자의 다른 Drive 파일에는 접근하지 않는다.
+ * (숨김 폴더용 drive.appdata 는 Google 이 기기 코드 방식에서 허용하지 않아 쓰지 않는다.)
  *
  * - 웹 브라우저: Google Identity Services 팝업 (액세스 토큰 1시간, 만료되면 '다시 연결' 필요)
  * - 앱(Windows/macOS/Android/iOS): 기기 코드 방식. 화면의 코드를 브라우저에서 한 번 입력하면
@@ -15,7 +16,7 @@ import { AuthError, GOOGLE_API, usingMockGoogle } from "./drive";
 const env = import.meta.env;
 const MOCK = env.VITE_MOCK_GOOGLE_URL as string | undefined;
 const OAUTH = MOCK ?? "https://oauth2.googleapis.com";
-export const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.appdata";
+export const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 const SCOPES = `openid email profile ${DRIVE_SCOPE}`;
 
 export const authFlow: "web" | "device" = isTauri || usingMockGoogle ? "device" : "web";
@@ -282,7 +283,7 @@ async function signInWeb() {
     client.requestAccessToken({ prompt: stored ? "" : "consent", login_hint: stored?.account.email });
   });
   if (!oauth2.hasGrantedAllScopes(resp, DRIVE_SCOPE)) {
-    throw new Error("Google Drive 앱 데이터 접근 권한을 허용해야 동기화할 수 있습니다.");
+    throw new Error("Google Drive 파일 접근 권한(이 앱이 만든 파일)을 허용해야 동기화할 수 있습니다.");
   }
   return { accessToken: resp.access_token, expiresAt: Date.now() + resp.expires_in * 1000, refreshToken: undefined };
 }

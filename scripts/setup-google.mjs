@@ -13,7 +13,7 @@ import { createInterface } from "node:readline/promises";
 import path from "node:path";
 
 const ENV_FILE = process.env.NOTEBLOOM_ENV_FILE ?? path.join(process.cwd(), ".env.local");
-const SCOPES = "openid email profile https://www.googleapis.com/auth/drive.appdata";
+const SCOPES = "openid email profile https://www.googleapis.com/auth/drive.file";
 const KEYS = {
   web: "VITE_GOOGLE_WEB_CLIENT_ID",
   deviceId: "VITE_GOOGLE_DEVICE_CLIENT_ID",
@@ -86,7 +86,7 @@ async function verifyDeviceClient(clientId) {
     const hints = {
       invalid_client: "Google can't find this client ID. Check that you copied it exactly.",
       unauthorized_client: "This client doesn't support device sign-in. Make sure its type is 'TVs and Limited Input devices'.",
-      invalid_scope: "The requested scopes were rejected. Add the drive.appdata scope under 'Data access' on the consent screen.",
+      invalid_scope: "The requested scopes were rejected. Add the drive.file scope under 'Data access' on the consent screen.",
       disabled_client: "This client is disabled. Check its status in the console.",
     };
     return { ok: false, message: hints[data.error] ?? `Google responded: ${data.error ?? res.status} ${data.error_description ?? ""}` };
@@ -185,7 +185,7 @@ ${c.dim("If you use an official Notebloom release, you don't need any of this.")
   console.log(`   - App name: ${c.bold("Notebloom")}`);
   console.log(`   - User support email: shown on the sign-in screen, so a ${c.bold("separate Gmail address")} is recommended.`);
   console.log("   - Audience: External");
-  console.log(`   - Data access (scopes): add ${c.bold(".../auth/drive.appdata")}, openid, email, profile`);
+  console.log(`   - Data access (scopes): add ${c.bold(".../auth/drive.file")}, openid, email, profile`);
   console.log(`   - Publishing status: ${c.bold("Publish to production")} ${c.dim("(in Testing, only test users can sign in and sign-ins expire every 7 days)")}`);
   openUrl(`https://console.cloud.google.com/apis/credentials/consent${q}`);
   await pause();

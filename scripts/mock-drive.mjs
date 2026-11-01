@@ -25,7 +25,26 @@ const devices = new Map(); // device_code -> { userCode, approved }
 
 const save = () => writeFileSync(DATA_FILE, JSON.stringify(db));
 const id = () => randomBytes(12).toString("hex");
-const meta = (f) => ({ id: f.id, name: f.name, version: String(f.version) });
+const meta = (f) => ({ id: f.id, name: f.name, version: String(f.version), createdTime: f.createdTime });
+
+/** Supports the only query the app sends: "appProperties has { key='K' and value='V' } and trashed = false" */
+function matchesQuery(f, q) {
+  const m = q && /appProperties has { key='([^']+)' and value='([^']+)' }/.exec(q);
+  return !m || f.appProperties?.[m[1]] === m[2];
+}
+
+function newFile(metadata, content) {
+  return {
+    id: id(),
+    name: metadata.name,
+    mimeType: metadata.mimeType,
+    parents: metadata.parents,
+    appProperties: metadata.appProperties,
+    createdTime: new Date().toISOString(),
+    version: 1,
+    data: content ? content.toString("base64") : "",
+  };
+}
 const logChange = (fileId, removed) => db.log.push({ fileId, removed });
 
 // Only accept requests from the dev app's origins (so other websites can't drive this server).
@@ -144,7 +163,7 @@ createServer(async (req, res) => {
     if (path === "/oauth2/v3/userinfo") return send(res, 200, ACCOUNT);
 
     if (req.method === "GET" && path === "/drive/v3/files") {
-      return send(res, 200, { files: Object.values(db.files).map(meta) });
+      return send(res, 200, { files: Object.values(db.files).filter((f) => matchesQuery(f, url.searchParams.get("q"))).map(meta) });
     }
     if (req.method === "GET" && path === "/drive/v3/changes/startPageToken") {
       return send(res, 200, { startPageToken: String(db.log.length + 1) });
@@ -163,9 +182,15 @@ createServer(async (req, res) => {
     if (fileMatch) {
       const [, upload, fileId] = fileMatch;
       const file = fileId && db.files[fileId];
-      if (req.method === "POST" && upload) {
-        const { metadata, content } = parseMultipart(await readBody(req), req.headers["content-type"]);
-        const f = { id: id(), name: metadata.name, version: 1, data: content.toString("base64") };
+      if (req.method === "POST" && !fileId) {
+        // upload: multipart (metadata + content); plain: metadata only (e.g. creating a folder)
+        const body = await readBody(req);
+        const { metadata, content } = upload
+          ? parseMultipart(body, req.headers["content-type"])
+          : { metadata: JSON.parse(body.toString("utf8")), content: null };
+        const missingParent = metadata.parents?.find((p) => !db.files[p]);
+        if (missingParent) return send(res, 404, { error: { code: 404, message: `File not found: ${missingParent}` } });
+        const f = newFile(metadata, content);
         db.files[f.id] = f;
         logChange(f.id, false);
         save();

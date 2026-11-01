@@ -25,12 +25,15 @@ There is no server and no Firebase.
  └──────────┬───────────┘      └──────────┬───────────┘
             │   upload / download (Drive REST API)   │
             └───────────────────┬────────────────────┘
-          Your Google Drive · hidden app folder (appDataFolder)
+          Your Google Drive · "Notebloom" folder
              index.yjs         page list, titles, hierarchy
              note-{id}.yjs     note content (one file per note)
 ```
 
-- The app only requests the `drive.appdata` scope. It can access the hidden folder it creates and nothing else in your Drive.
+- The app only requests the `drive.file` scope: it can access the files it creates itself and nothing else in your Drive.
+  The files live in a `Notebloom` folder you can see in Drive. They're managed by the app, so don't edit or delete them by hand.
+  (Files are found by a hidden marker, so renaming or moving the folder doesn't break sync.)
+- Why not the hidden app-data folder (`drive.appdata`)? Google doesn't allow that scope with the device-code sign-in the apps use.
 - Sync = download the remote file → merge it into the local document → upload if the local copy has anything the remote one lacks.
   Yjs merges are order-independent and safe to repeat, so even if two devices upload at the same moment and one overwrites the other,
   the overwritten device notices the difference on its next check and uploads again. Every edit ends up merged.
@@ -95,9 +98,9 @@ At <https://console.cloud.google.com>:
 2. **APIs & Services → Library**: enable the `Google Drive API`
 3. **OAuth consent screen** (Google Auth Platform)
    - Audience `External`; app name and support email (the support email is shown on the sign-in screen)
-   - Data access (scopes): `.../auth/drive.appdata`, `openid`, `email`, `profile`
+   - Data access (scopes): `.../auth/drive.file`, `openid`, `email`, `profile`
    - **Publish to production.** While the app is in `Testing`, only listed test users can sign in and Google expires sign-ins (refresh tokens) every 7 days.
-     `drive.appdata` is a narrow scope recommended by Google; the console shows any verification requirements.
+     `drive.file` is a narrow, non-sensitive scope recommended by Google; the console shows any verification requirements.
 4. **Credentials → Create OAuth client**, twice:
    - `TVs and Limited Input devices`: for the desktop and mobile apps (client ID + client secret)
    - `Web application`: for the web version; add `http://localhost:5173` (and your deployed URL) to the authorized JavaScript origins
@@ -168,7 +171,7 @@ Notes:
 
 ## Security
 
-- **Least privilege**: the only Google scope is `drive.appdata` (the hidden app folder), and the app's network allowlist contains just the Google sign-in and Drive API hosts.
+- **Least privilege**: the only Google scope is `drive.file` (only files the app created), and the app's network allowlist contains just the Google sign-in and Drive API hosts.
 - **CSP**: the desktop and mobile apps enforce a Content Security Policy that blocks external and inline scripts ([tauri.conf.json](src-tauri/tauri.conf.json)).
   When hosting the web version, send a similar CSP header from your server (allowing Google's sign-in script and the Drive API):
   `default-src 'self'; script-src 'self' https://accounts.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https://www.googleapis.com https://oauth2.googleapis.com; frame-src https://accounts.google.com; object-src 'none'; base-uri 'self'`
@@ -184,7 +187,7 @@ src/
   store/docs.ts             Yjs documents + IndexedDB persistence (shared instances, release)
   store/notes.ts            page list (index document): create, update, trash, delete permanently
   sync/auth.ts              Google sign-in (web popup / device code in apps), token refresh
-  sync/drive.ts             Google Drive REST API (appDataFolder, changes, uploads)
+  sync/drive.ts             Google Drive REST API (Notebloom folder, changes, uploads)
   sync/engine.ts            sync engine (change detection, merging, uploads, delete propagation, account switching)
   components/               Sidebar, PageView, Editor, Home, Dialogs, ui
   platform.ts               web vs. app (Tauri) differences (HTTP, external links)
