@@ -14,7 +14,7 @@ There is no server and no Firebase.
 - **Google Drive sync**: edits upload about 1.5 s after you stop typing; other devices pick up changes every 5 s
 - **Conflict-free merging**: edit the same paragraph offline on two devices and both edits survive once they reconnect (Yjs CRDT)
 - **Trash** (restore / delete permanently on all devices), **quick search** `Ctrl/Cmd + K`, dark mode, mobile layout
-- **Works with AI tools**: an [MCP server](mcp/README.md) lets Claude, Cursor and other AI assistants search, read, write and organize your notes
+- **Works with AI tools**: an [MCP server](mcp/README.md) lets Claude, Cursor and other AI assistants search, read, write and organize your notes through the desktop app
 
 ## How it works
 
@@ -122,17 +122,19 @@ How sign-in works:
 
 The [mcp](mcp) folder contains a [Model Context Protocol](https://modelcontextprotocol.io) server, so AI assistants such as
 Claude (Desktop and Code) and Cursor can list, search, read, create and edit your notes, and move them around or to the trash.
-It works directly with your Google Drive (the app doesn't need to be running), and changes appear in the app on every device within seconds.
+It talks directly to the Notebloom desktop app on the same computer (over `127.0.0.1` with a per-launch access token), so changes
+show up in the app instantly and sync to your other devices as usual. It needs no sign-in of its own and works offline.
 
 ```bash
-cd mcp && npm install && npm run login
+cd mcp && npm install
 ```
 
 ```bash
 claude mcp add notebloom --scope user -- node /path/to/notebloom/mcp/server.mjs
 ```
 
-See [mcp/README.md](mcp/README.md) for other AI tools, how it stays safe alongside the app, and security notes.
+AI access can be turned off in the app (account/sync dialog → AI 도구 연결). See [mcp/README.md](mcp/README.md) for other AI tools,
+how it works and security notes.
 
 ## Building the desktop & mobile apps (Tauri 2)
 
@@ -189,6 +191,9 @@ Notes:
 ## Security
 
 - **Least privilege**: the only Google scope is `drive.file` (only files the app created), and the app's network allowlist contains just the Google sign-in and Drive API hosts.
+- **AI tool connection**: the desktop app accepts requests from the MCP server only on `127.0.0.1`, only with an access token that changes
+  on every launch (stored in a file only your user can read), and rejects requests from web pages. It can be turned off in the app,
+  and there is no way to delete notes permanently through it ([details](mcp/README.md#security)).
 - **CSP**: the desktop and mobile apps enforce a Content Security Policy that blocks external and inline scripts ([tauri.conf.json](src-tauri/tauri.conf.json)).
   When hosting the web version, send a similar CSP header from your server (allowing Google's sign-in script and the Drive API):
   `default-src 'self'; script-src 'self' https://accounts.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https://www.googleapis.com https://oauth2.googleapis.com; frame-src https://accounts.google.com; object-src 'none'; base-uri 'self'`
@@ -207,13 +212,15 @@ src/
   sync/drive.ts             Google Drive REST API (Notebloom folder, changes, uploads)
   sync/engine.ts            sync engine (change detection, merging, uploads, delete propagation, account switching)
   components/               Sidebar, PageView, Editor, Home, Dialogs, ui
+  ai/                       requests from AI tools (MCP): local connection + note operations in Markdown
   platform.ts               web vs. app (Tauri) differences (HTTP, external links)
 scripts/
   setup-google.mjs          Google Drive setup helper (npm run setup:google)
   mock-drive.mjs            mock Google server for development (npm run mock-drive)
   third-party-notices.mjs   generates the open source license notices (runs on build)
 src-tauri/                  Tauri 2 native shell (Rust), Android project in gen/android
-mcp/                        MCP server for AI tools (separate npm package)
+  src/ai_bridge.rs          local HTTP endpoint for the MCP server (127.0.0.1, access token)
+mcp/                        MCP server for AI tools (separate npm package, talks to the desktop app)
 ```
 
 ## Known limitations / roadmap

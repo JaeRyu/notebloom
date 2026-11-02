@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { setAiBridgeEnabled, useAiBridge } from "../ai/bridge";
 import { ancestorsOf, navigate, pageTitle, type PageTree } from "../hooks";
 import { openExternal } from "../platform";
 import { deletePageForever, updatePage } from "../store/notes";
@@ -149,8 +150,29 @@ export function AccountDialog({ onClose }: { onClose: () => void }) {
           </>
         )}
         {error && <div className="form-error">{error}</div>}
+        <AiToolsSection />
       </div>
     </Modal>
+  );
+}
+
+/** AI 도구(MCP) 연결 허용 여부. 데스크톱 앱에서만 보인다. */
+function AiToolsSection() {
+  const ai = useAiBridge();
+  if (!ai.available) return null;
+  return (
+    <section className="ai-tools">
+      <h3>AI 도구 연결 (MCP)</h3>
+      <label className="toggle-row">
+        <input type="checkbox" checked={ai.enabled} onChange={(e) => setAiBridgeEnabled(e.target.checked)} />
+        <span>이 컴퓨터의 AI 도구(Claude, Cursor 등)가 Notebloom MCP 서버로 노트를 읽고 쓸 수 있게 허용</span>
+      </label>
+      <p className="muted small">
+        AI 가 바꾼 내용은 바로 화면에 보이고 다른 기기와 동기화됩니다. 노트를 영구 삭제할 수는 없습니다. 연결 방법은 저장소의
+        mcp/README.md 를 참고하세요.
+      </p>
+      {ai.error && <div className="form-error">{ai.error}</div>}
+    </section>
   );
 }
 

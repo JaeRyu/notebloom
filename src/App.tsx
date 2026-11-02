@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useIsMobile, usePages, usePageTree, useRoute, WIDE_LAYOUT_MIN_WIDTH } from "./hooks";
 import { resumeSync } from "./sync/engine";
+import { startAiBridge } from "./ai/bridge";
 import { AccountDialog, QuickSearch, TrashDialog } from "./components/Dialogs";
 import { Home } from "./components/Home";
 import { PageView } from "./components/PageView";
@@ -19,6 +20,9 @@ export default function App() {
 
   // 이전에 Google 계정을 연결했다면 동기화를 이어간다.
   useEffect(() => resumeSync(), []);
+
+  // 데스크톱 앱이면 AI 도구(MCP 서버)의 연결을 받는다.
+  useEffect(() => startAiBridge(), []);
 
   // 화면이 휴대폰 폭으로 줄면 사이드바를 닫고(드로어), 넓어지면 다시 연다.
   useEffect(() => setSidebarOpen(!isMobile), [isMobile]);

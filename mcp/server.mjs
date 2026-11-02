@@ -1,32 +1,22 @@
 #!/usr/bin/env node
-// Notebloom MCP server: lets AI tools (Claude, Cursor, …) read and edit your Notebloom notes.
+// Notebloom MCP server: lets AI tools (Claude, Cursor, …) read and edit your notes through the Notebloom
+// desktop app running on this computer.
 //
 //   node server.mjs          run the MCP server over stdio (what AI tools launch)
-//   node server.mjs login    sign in to Google (once)
-//   node server.mjs status   show the signed-in account and check Drive access
-//   node server.mjs logout   sign out and revoke access
+//   node server.mjs status   check the connection to the app
 
 import { readFileSync } from "node:fs";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { login, logout, signedInAccount, tokenFilePath } from "./lib/google.mjs";
-import {
-  appendToNote,
-  createNote,
-  displayTitle,
-  listNotes,
-  readNote,
-  replaceNoteContent,
-  searchNotes,
-  updateNote,
-} from "./lib/notes.mjs";
+import { appDataDir, appStatus, callApp, installedApp } from "./lib/app.mjs";
 
 const { version } = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8"));
 
 // ---- Formatting --------------------------------------------------------------
 
 const date = (ms) => (ms ? new Date(ms).toISOString().slice(0, 16).replace("T", " ") + " UTC" : "unknown");
+const displayTitle = (p) => p.title.trim() || "Untitled";
 const label = (p) => `${p.icon ? `${p.icon} ` : ""}${displayTitle(p)}`;
 const trashTag = (p) => (p.inTrash ? " (in trash)" : "");
 
@@ -37,8 +27,9 @@ function outline(notes) {
 
 // ---- MCP server --------------------------------------------------------------
 
-const INSTRUCTIONS = `Notebloom is the user's personal note app. Notes are pages in a tree (a note can have sub-notes) and
-sync through the user's Google Drive to all their devices, usually within seconds.
+const INSTRUCTIONS = `Notebloom is the user's personal note app. Notes are pages in a tree (a note can have sub-notes).
+These tools work through the Notebloom app on this computer: changes appear in the app immediately and sync to the
+user's other devices through their Google Drive.
 - Find notes with list_notes or search_notes; the other tools take the note id they return.
 - Note content is read and written as Markdown. Notes can hold formatting Markdown can't express (e.g. text colors);
   replace_note_content keeps that formatting for every block whose text you leave unchanged.
@@ -75,7 +66,7 @@ async function serve() {
       annotations: readOnly,
     },
     async ({ include_trashed }) => {
-      const notes = await listNotes({ includeTrashed: include_trashed });
+      const notes = await callApp("listNotes", { includeTrashed: include_trashed });
       return `${notes.length} note${notes.length === 1 ? "" : "s"}:\n${outline(notes)}`;
     },
   );
@@ -93,7 +84,7 @@ async function serve() {
       annotations: readOnly,
     },
     async ({ query, limit, include_trashed }) => {
-      const results = await searchNotes(query, { limit, includeTrashed: include_trashed });
+      const results = await callApp("searchNotes", { query, limit, includeTrashed: include_trashed });
       if (!results.length) return `No notes match "${query}".`;
       return results
         .map((p) => `- ${label(p)}  [id: ${p.id}]${trashTag(p)}\n  in: ${p.path.join(" / ")}${p.snippet ? `\n  "${p.snippet}"` : ""}`)
@@ -110,7 +101,7 @@ async function serve() {
       annotations: readOnly,
     },
     async ({ note_id }) => {
-      const n = await readNote(note_id);
+      const n = await callApp("readNote", { id: note_id });
       const lines = [
         `Title: ${label(n)}${trashTag(n)}`,
         `Id: ${n.id}`,
@@ -137,8 +128,8 @@ async function serve() {
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
     async ({ title, markdown, parent_id, icon }) => {
-      const id = await createNote({ title, markdown, parentId: parent_id ?? null, icon: icon ?? "" });
-      return `Created note "${title.trim() || "Untitled"}" [id: ${id}]. It appears in the Notebloom app on the user's devices within a few seconds.`;
+      const { id } = await callApp("createNote", { title, markdown, parentId: parent_id ?? null, icon });
+      return `Created note "${title.trim() || "Untitled"}" [id: ${id}].`;
     },
   );
 
@@ -151,7 +142,7 @@ async function serve() {
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
     async ({ note_id, markdown }) => {
-      await appendToNote(note_id, markdown);
+      await callApp("appendToNote", { id: note_id, markdown });
       return "Appended.";
     },
   );
@@ -167,7 +158,7 @@ async function serve() {
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     },
     async ({ note_id, markdown }) => {
-      await replaceNoteContent(note_id, markdown);
+      await callApp("replaceNoteContent", { id: note_id, markdown });
       return "Content replaced.";
     },
   );
@@ -187,7 +178,7 @@ async function serve() {
     },
     async ({ note_id, title, icon, parent_id }) => {
       if (title === undefined && icon === undefined && parent_id === undefined) throw new Error("Nothing to change.");
-      const p = await updateNote(note_id, { title, icon, parentId: parent_id });
+      const p = await callApp("updateNote", { id: note_id, title, icon, parentId: parent_id });
       return `Updated: ${label(p)}  [id: ${p.id}], located at ${p.path.join(" / ")}${trashTag(p)}`;
     },
   );
@@ -201,7 +192,7 @@ async function serve() {
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ note_id }) => {
-      const p = await updateNote(note_id, { archived: true });
+      const p = await callApp("updateNote", { id: note_id, archived: true });
       return `Moved "${displayTitle(p)}" to the trash.`;
     },
   );
@@ -215,7 +206,7 @@ async function serve() {
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ note_id }) => {
-      const p = await updateNote(note_id, { archived: false });
+      const p = await callApp("updateNote", { id: note_id, archived: false });
       if (p.inTrash) {
         return `Restored "${displayTitle(p)}", but a note it's inside (${p.path.slice(0, -1).join(" / ")}) is still in the trash. Restore that one too, or move this note with update_note.`;
       }
@@ -224,41 +215,27 @@ async function serve() {
   );
 
   await server.connect(new StdioServerTransport());
-  const account = signedInAccount();
-  console.error(`Notebloom MCP server ${version} running (${account ? `signed in as ${account.email}` : "not signed in: run 'node server.mjs login'"})`);
+  console.error(`Notebloom MCP server ${version} running (app data folder: ${appDataDir()})`);
 }
 
 // ---- CLI -----------------------------------------------------------------------
 
 async function status() {
-  const account = signedInAccount();
-  if (!account) {
-    console.log("Not signed in. Run: node server.mjs login");
-    process.exitCode = 1;
+  const app = await appStatus();
+  if (app) {
+    console.log(`Connected to Notebloom ${app.version}: ${app.notes} notes, sync: ${app.sync}.`);
     return;
   }
-  console.log(`Signed in as ${account.name} <${account.email}>`);
-  console.log(`Token file: ${tokenFilePath}`);
-  const notes = await listNotes({ includeTrashed: true });
-  console.log(`Google Drive access OK: ${notes.filter((n) => !n.inTrash).length} notes (${notes.filter((n) => n.inTrash).length} in trash).`);
+  const exe = installedApp();
+  console.log("Notebloom isn't running (or 'AI 도구 연결' is turned off in the app).");
+  console.log(exe ? `It will be started automatically when an AI tool needs it: ${exe}` : "Open the Notebloom desktop app to use it from AI tools.");
+  process.exitCode = 1;
 }
 
-const commands = {
-  async login() {
-    const account = await login();
-    console.log(`\nSigned in as ${account.name} <${account.email}>. AI tools connected to this server can now use your notes.`);
-  },
-  async logout() {
-    await logout();
-    console.log("Signed out.");
-  },
-  status,
-  serve,
-};
-
+const commands = { serve, status };
 const command = process.argv[2] ?? "serve";
 if (!commands[command]) {
-  console.error(`Unknown command "${command}". Use: login | status | logout (or no argument to run the MCP server).`);
+  console.error(`Unknown command "${command}". Use: status (or no argument to run the MCP server).`);
   process.exit(2);
 }
 try {

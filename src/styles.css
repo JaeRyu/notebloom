@@ -1047,6 +1047,32 @@ button.sync:hover {
   text-align: center;
   align-items: center;
 }
+.ai-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.dialog-body .ai-tools h3 {
+  margin: 0;
+}
+.toggle-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  cursor: pointer;
+}
+.dialog-body .toggle-row input {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 2px 0 0;
+  padding: 0;
+  accent-color: var(--accent);
+}
 .device-code {
   font-size: 34px;
   font-weight: 700;
