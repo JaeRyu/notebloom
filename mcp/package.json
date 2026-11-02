@@ -1,0 +1,30 @@
+{
+  "name": "notebloom-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MCP server that lets AI tools read and edit your Notebloom notes in Google Drive",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "notebloom-mcp": "server.mjs"
+  },
+  "scripts": {
+    "start": "node server.mjs",
+    "login": "node server.mjs login",
+    "status": "node server.mjs status",
+    "logout": "node server.mjs logout"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@blocknote/core": "^0.57.0",
+    "@blocknote/server-util": "^0.57.0",
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "y-prosemirror": "^1.3.7",
+    "yjs": "^13.6.33",
+    "zod": "^4.6.7"
+  }
+}

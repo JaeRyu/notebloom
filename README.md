@@ -14,6 +14,7 @@ There is no server and no Firebase.
 - **Google Drive sync**: edits upload about 1.5 s after you stop typing; other devices pick up changes every 5 s
 - **Conflict-free merging**: edit the same paragraph offline on two devices and both edits survive once they reconnect (Yjs CRDT)
 - **Trash** (restore / delete permanently on all devices), **quick search** `Ctrl/Cmd + K`, dark mode, mobile layout
+- **Works with AI tools**: an [MCP server](mcp/README.md) lets Claude, Cursor and other AI assistants search, read, write and organize your notes
 
 ## How it works
 
@@ -117,6 +118,22 @@ How sign-in works:
 > the client secret of installed apps as confidential. They can't be used to read anyone's notes (each user must sign in and consent),
 > and the Drive API is free, so there is no billing risk. They are kept out of this repository anyway; official builds include them at build time.
 
+## Using Notebloom from AI tools (MCP)
+
+The [mcp](mcp) folder contains a [Model Context Protocol](https://modelcontextprotocol.io) server, so AI assistants such as
+Claude (Desktop and Code) and Cursor can list, search, read, create and edit your notes, and move them around or to the trash.
+It works directly with your Google Drive (the app doesn't need to be running), and changes appear in the app on every device within seconds.
+
+```bash
+cd mcp && npm install && npm run login
+```
+
+```bash
+claude mcp add notebloom --scope user -- node /path/to/notebloom/mcp/server.mjs
+```
+
+See [mcp/README.md](mcp/README.md) for other AI tools, how it stays safe alongside the app, and security notes.
+
 ## Building the desktop & mobile apps (Tauri 2)
 
 Common prerequisites: [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/), Rust (`rustup`).
@@ -196,6 +213,7 @@ scripts/
   mock-drive.mjs            mock Google server for development (npm run mock-drive)
   third-party-notices.mjs   generates the open source license notices (runs on build)
 src-tauri/                  Tauri 2 native shell (Rust), Android project in gen/android
+mcp/                        MCP server for AI tools (separate npm package)
 ```
 
 ## Known limitations / roadmap
